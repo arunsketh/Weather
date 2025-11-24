@@ -198,87 +198,77 @@ if lat and lon:
 
         st.divider()
 
-        # --- RESPONSIVE GRID VIEW (HTML/CSS) ---
+        # --- FORECAST COLUMNS (Native Streamlit) ---
         st.subheader("📅 11-Day Forecast")
         st.caption("7:00 AM Snapshot")
         
         today_date = datetime.now().date()
         
-        # Build HTML content
-        grid_html = ""
-        for index, row in morning_df.iterrows():
-            date_diff = (row['date'] - today_date).days
-            
-            # Visual Styles based on time
-            if date_diff == 0:
-                card_class = "card-today"
-                badge = "TODAY"
-            elif abs(date_diff) == 1:
-                card_class = "card-medium"
-                badge = row['date'].strftime('%a %d')
-            else:
-                card_class = "card-small"
-                badge = row['date'].strftime('%a %d')
+        # We use native Streamlit columns.
+        # 6 Columns means it will likely wrap to 2 rows (6 and 5)
+        cols = st.columns(6) 
 
-            bg_color = row['bg_color']
-            text_color = row['text_color']
-            
-            grid_html += f"""
-            <div class="weather-card {card_class}" style="background-color: {bg_color};">
-                <div class="card-badge">{badge}</div>
-                <div class="card-temp">{row['temp_c']}°C</div>
-                <div class="card-risk" style="color: {text_color};">{row['risk']}</div>
-                <div class="card-delay">+{row['total_delay']}m</div>
-            </div>
-            """
-
-        # CSS GRID: auto-fill with minmax ensures responsive columns on mobile
-        st.markdown(f"""
+        # CSS to style the CONTENT inside the native columns
+        st.markdown("""
         <style>
-        .weather-grid {{
-            display: grid;
-            /* This magic line forces 2+ columns on mobile (if screen > 220px) */
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            gap: 8px;
-            width: 100%;
-        }}
-        
-        .weather-card {{
+        .weather-card {
             padding: 8px;
             border-radius: 10px;
             text-align: center;
             border: 1px solid #ddd;
-            background-color: white;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }}
+            margin-bottom: 10px; /* Spacing between stacked rows */
+        }
         
-        /* Size Logic: We control visual weight via font/border, not physical grid cell size 
-           to keep the grid aligned cleanly */
-        .card-small {{ min-height: 90px; opacity: 0.9; }}
-        .card-small .card-temp {{ font-size: 1em; font-weight: bold; }}
+        .card-small { min-height: 90px; font-size: 0.85em; opacity: 0.9; }
+        .card-medium { min-height: 100px; font-size: 0.95em; border-color: #bbb; }
         
-        .card-medium {{ min-height: 100px; border-color: #bbb; }}
-        .card-medium .card-temp {{ font-size: 1.1em; font-weight: bold; }}
-        
-        .card-today {{ 
+        .card-today { 
             min-height: 110px; 
+            font-size: 1em;
             border: 2px solid #2962ff; 
-            background-color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             z-index: 2;
-        }}
-        .card-today .card-temp {{ font-size: 1.3em; font-weight: 900; color: #2962ff; }}
-        .card-today .card-badge {{ font-weight: 900; color: #2962ff; }}
-
-        .card-badge {{ font-size: 0.8em; margin-bottom: 4px; font-weight: bold; }}
-        .card-risk {{ font-size: 0.75em; font-weight: 600; margin: 2px 0; line-height: 1.1; }}
-        .card-delay {{ font-size: 0.7em; margin-top: 4px; opacity: 0.6; }}
+        }
+        
+        .card-temp { font-weight: bold; margin: 4px 0; }
+        .card-badge { font-weight: bold; font-size: 0.8em; margin-bottom: 4px; }
         </style>
-
-        <div class="weather-grid">
-            {grid_html}
-        </div>
         """, unsafe_allow_html=True)
+
+        for index, row in morning_df.iterrows():
+            # Use modulo to cycle through the 6 columns
+            col_idx = index % 6
+            
+            date_diff = (row['date'] - today_date).days
+            
+            # Determine Style Class
+            if date_diff == 0:
+                card_class = "card-today"
+                badge = "TODAY"
+                temp_size = "1.3em"
+            elif abs(date_diff) == 1:
+                card_class = "card-medium"
+                badge = row['date'].strftime('%a %d')
+                temp_size = "1.1em"
+            else:
+                card_class = "card-small"
+                badge = row['date'].strftime('%a %d')
+                temp_size = "1.0em"
+
+            bg_color = row['bg_color']
+            text_color = row['text_color']
+            
+            # Inject HTML card into the specific Streamlit column
+            with cols[col_idx]:
+                st.markdown(f"""
+                <div class="weather-card {card_class}" style="background-color: {bg_color};">
+                    <div class="card-badge">{badge}</div>
+                    <div class="card-temp" style="font-size: {temp_size};">{row['temp_c']}°C</div>
+                    <div style="color: {text_color}; font-weight: 600; font-size: 0.8em; line-height: 1.1;">{row['risk']}</div>
+                    <div style="font-size: 0.75em; margin-top: 4px; opacity: 0.7;">+{row['total_delay']}m</div>
+                </div>
+                """, unsafe_allow_html=True)
