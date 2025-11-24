@@ -231,81 +231,81 @@ if lat and lon:
             </div>
             """
 
-        # CSS: Uses 'inline-block' method which is much more robust than flexbox for this
+        # CSS: Using Flexbox which is superior for horizontal alignment
         st.markdown(f"""
         <style>
-        .scroll-outer-wrapper {{
-            display: block;
-            width: 100%;
+        .scroll-container {{
+            display: flex; /* Forces items into a row */
+            flex-direction: row;
+            flex-wrap: nowrap; /* Prevents wrapping to next line */
             overflow-x: auto;
-            white-space: nowrap;
-            padding: 10px 0 20px 0; /* padding bottom for scrollbar */
+            gap: 12px;
+            padding: 15px 5px 25px 5px; /* Bottom padding for scrollbar */
+            align-items: center;
             -webkit-overflow-scrolling: touch;
+            width: 100%;
         }}
         
-        /* The cards as inline blocks - this forces them into a single line */
         .weather-card {{
-            display: inline-block !important;
-            vertical-align: middle; /* Align them by their middle */
-            margin-right: 12px;
-            white-space: normal; /* Allow text inside to wrap if needed */
+            flex: 0 0 auto; /* KEY: Prevents shrinking/stacking */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             text-align: center;
             border-radius: 12px;
             border: 1px solid #ddd;
             background-color: white;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            /* Important: Prevents squishing */
-            flex-shrink: 0; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
         }}
 
-        /* Specific Sizes with !important to ensure they stick */
+        /* SIZES */
         .card-small {{
-            width: 85px !important;
-            height: 100px !important;
-            padding-top: 10px;
+            width: 80px;
+            height: 95px;
+            font-size: 0.8rem;
         }}
-        .card-small .card-temp {{ font-size: 0.9rem; font-weight: bold; }}
-        .card-small .card-risk {{ font-size: 0.7rem; }}
-        
+        .card-small .card-temp {{ font-size: 1rem; font-weight: bold; }}
+
         .card-medium {{
-            width: 110px !important;
-            height: 120px !important;
-            padding-top: 15px;
+            width: 110px;
+            height: 120px;
+            font-size: 0.9rem;
             border: 1px solid #bbb;
         }}
-        .card-medium .card-temp {{ font-size: 1.1rem; font-weight: bold; }}
-        .card-medium .card-risk {{ font-size: 0.8rem; }}
+        .card-medium .card-temp {{ font-size: 1.2rem; font-weight: bold; }}
         
         .card-today {{
-            width: 150px !important;
-            height: 160px !important;
-            padding-top: 20px;
-            border: 3px solid #2962ff !important;
+            width: 140px;
+            height: 150px;
+            font-size: 1rem;
+            border: 2px solid #2962ff;
             background: #fff;
-            box-shadow: 0 5px 15px rgba(41, 98, 255, 0.2);
-            z-index: 2;
+            box-shadow: 0 4px 12px rgba(41, 98, 255, 0.2);
+            z-index: 5;
         }}
-        .card-today .card-temp {{ font-size: 1.5rem; font-weight: 900; }}
-        .card-today .card-risk {{ font-size: 1rem; font-weight: bold; }}
+        .card-today .card-temp {{ font-size: 1.6rem; font-weight: 900; }}
 
-        .card-badge {{ font-weight: bold; margin-bottom: 5px; font-size: 0.85rem; }}
-        .card-delay {{ opacity: 0.7; font-size: 0.8rem; margin-top: 5px; }}
+        /* Text Elements */
+        .card-badge {{ font-weight: bold; margin-bottom: 4px; }}
+        .card-risk {{ font-weight: 600; margin-bottom: 2px; line-height: 1.1; }}
+        .card-delay {{ opacity: 0.7; font-size: 0.85em; margin-top: 4px; }}
 
-        /* Scrollbar styling */
-        .scroll-outer-wrapper::-webkit-scrollbar {{
+        /* Scrollbar Styling */
+        .scroll-container::-webkit-scrollbar {{
             height: 8px;
         }}
-        .scroll-outer-wrapper::-webkit-scrollbar-track {{
-            background: #f1f1f1;
+        .scroll-container::-webkit-scrollbar-track {{
+            background: #f0f0f0;
             border-radius: 4px;
         }}
-        .scroll-outer-wrapper::-webkit-scrollbar-thumb {{
-            background: #ccc;
+        .scroll-container::-webkit-scrollbar-thumb {{
+            background: #c1c1c1;
             border-radius: 4px;
         }}
         </style>
 
-        <div class="scroll-outer-wrapper">
+        <div class="scroll-container">
             {cards_html}
         </div>
         """, unsafe_allow_html=True)
