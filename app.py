@@ -19,6 +19,7 @@ CAR_TYPES = {
 @st.cache_data(ttl=3600)
 def get_weather_data(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
+    # Fetches 5 past days and 6 forecast days (Today + 5 future)
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -198,32 +199,27 @@ if lat and lon:
 
         st.divider()
 
-        # --- SCROLLABLE STRIP (HTML/CSS) ---
-        st.subheader("📅 11-Day Forecast Timeline")
-        st.caption("Swipe left/right to see more days")
+        # --- HORIZONTAL SCROLLABLE TIMELINE ---
+        st.subheader("📅 11-Day Forecast")
+        st.caption("Swipe to see past and future days")
         
         today_date = datetime.now().date()
         
-        # Generate HTML for each card
         cards_html = ""
         for index, row in morning_df.iterrows():
             date_diff = (row['date'] - today_date).days
             
-            # Determine Size Class & Badge
+            # Logic: Past/Future=Small, Yest/Tom=Medium, Today=Big
             if date_diff == 0:
-                # TODAY
                 size_class = "card-today"
                 badge = "TODAY"
             elif date_diff == 1 or date_diff == -1:
-                # YESTERDAY / TOMORROW
                 size_class = "card-medium"
                 badge = row['date'].strftime('%a %d')
             else:
-                # PAST / FUTURE
                 size_class = "card-small"
                 badge = row['date'].strftime('%a %d')
 
-            # content
             bg_color = row['bg_color']
             text_color = row['text_color']
             
@@ -236,67 +232,87 @@ if lat and lon:
             </div>
             """
 
-        # Inject Custom CSS and the Container
+        # CSS: Enforces horizontal layout with flexbox
         st.markdown(f"""
         <style>
-        /* Scroll Container */
-        .scroll-container {{
-            display: flex;
-            flex-wrap: nowrap;
+        .scroll-outer-wrapper {{
+            width: 100%;
             overflow-x: auto;
-            gap: 8px;
+            white-space: nowrap;
             padding-bottom: 15px;
-            align-items: center; /* Vertically center items of diff sizes */
-            -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
-            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
         }}
         
-        /* Base Card */
+        .scroll-container {{
+            display: inline-flex !important; /* Forces horizontal row */
+            gap: 10px;
+            padding: 10px 5px;
+            align-items: center; /* Vertically center items */
+        }}
+        
         .weather-card {{
-            flex: 0 0 auto; /* Do not shrink */
-            border-radius: 10px;
-            border: 1px solid #eee;
-            text-align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            align-items: center;
+            border-radius: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+            flex-shrink: 0; /* Prevents squishing */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
         }}
 
-        /* Sizing Classes */
+        /* Small: Past & Future */
         .card-small {{
-            width: 75px;
+            width: 80px;
             height: 90px;
-            font-size: 0.75rem;
-            opacity: 0.8;
+            font-size: 0.7rem;
+            opacity: 0.85;
         }}
         
+        /* Medium: Yesterday & Tomorrow */
         .card-medium {{
-            width: 95px;
+            width: 100px;
             height: 110px;
             font-size: 0.85rem;
-            border: 1px solid #ccc;
+            border: 1px solid #bbb;
+            font-weight: 500;
         }}
         
+        /* Large: Today */
         .card-today {{
-            width: 120px;
+            width: 130px;
             height: 140px;
             font-size: 1rem;
             border: 2px solid #2962ff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 10;
-            background: white;
+            background: #fff;
+            box-shadow: 0 5px 15px rgba(41, 98, 255, 0.2);
+            z-index: 2;
         }}
 
-        /* Internal Elements */
-        .card-badge {{ font-weight: bold; margin-bottom: 2px; }}
-        .card-temp {{ font-weight: 800; margin: 2px 0; }}
-        .card-risk {{ font-weight: 600; margin-bottom: 2px; line-height: 1.1; }}
-        .card-delay {{ font-size: 0.8em; opacity: 0.7; }}
+        .card-badge {{ font-weight: bold; margin-bottom: 4px; }}
+        .card-temp {{ font-weight: 800; font-size: 1.1em; margin: 2px 0; }}
+        .card-risk {{ font-weight: 600; margin-bottom: 2px; }}
+        .card-delay {{ opacity: 0.7; font-size: 0.9em; }}
 
+        /* Custom Scrollbar for Chrome/Safari/Edge */
+        .scroll-outer-wrapper::-webkit-scrollbar {{
+            height: 6px;
+        }}
+        .scroll-outer-wrapper::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+            border-radius: 3px;
+        }}
+        .scroll-outer-wrapper::-webkit-scrollbar-thumb {{
+            background: #ccc;
+            border-radius: 3px;
+        }}
         </style>
 
-        <div class="scroll-container">
-            {cards_html}
+        <div class="scroll-outer-wrapper">
+            <div class="scroll-container">
+                {cards_html}
+            </div>
         </div>
         """, unsafe_allow_html=True)
