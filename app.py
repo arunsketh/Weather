@@ -52,6 +52,42 @@ def get_weather_data(lat, lon):
         st.error(f"Error fetching weather data: {e}")
         return pd.DataFrame()
 
+def get_coordinates_from_search(query):
+    """
+    Tries to resolve a query to coordinates.
+    Priority 1: UK Postcode API (postcodes.io)
+    Priority 2: Open-Meteo Geocoding API (City names)
+    """
+    # 1. Try UK Postcode
+    try:
+        # Clean query for postcode (remove spaces for checking, though API handles them)
+        clean_query = query.strip().replace(" ", "")
+        # quick regex check if it looks vaguely like a postcode to avoid unnecessary API calls for city names
+        # but postcodes.io is fast, so we can just hit it.
+        resp = requests.get(f"https://api.postcodes.io/postcodes/{clean_query}", timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()['result']
+            return data['latitude'], data['longitude'], f"{data['postcode']}, {data.get('admin_district', 'UK')}"
+    except:
+        pass # Fall through to city search
+
+    # 2. Try City Name (Open-Meteo Geocoding)
+    try:
+        resp = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": query, "count": 1, "language": "en", "format": "json"},
+            timeout=3
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if 'results' in data and data['results']:
+                res = data['results'][0]
+                return res['latitude'], res['longitude'], f"{res['name']}, {res.get('country', '')}"
+    except:
+        pass
+        
+    return None, None, None
+
 def calculate_frost_risk(row):
     """
     Determines frost/fog risk based on physics.
@@ -113,6 +149,24 @@ if 'longitude' not in st.session_state:
     st.session_state.longitude = -0.12
 
 with st.container():
+    # --- NEW: Search Bar ---
+    search_col1, search_col2 = st.columns([3, 1])
+    with search_col1:
+        search_query = st.text_input("Search UK Postcode or City", placeholder="e.g., SW1A 1AA or Manchester")
+    with search_col2:
+        st.write("") # Spacing
+        st.write("") # Spacing
+        if st.button("🔎 Search"):
+            if search_query:
+                found_lat, found_lon, found_name = get_coordinates_from_search(search_query)
+                if found_lat:
+                    st.session_state.latitude = found_lat
+                    st.session_state.longitude = found_lon
+                    st.success(f"Found: {found_name}")
+                    st.rerun()
+                else:
+                    st.error("Location not found. Try a valid Postcode or City.")
+
     col1, col2 = st.columns(2)
     with col1:
         # Using 'key' links this widget to st.session_state.latitude automatically
