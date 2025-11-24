@@ -106,28 +106,40 @@ st.title("❄️ Windscreen Frost Predictor")
 st.markdown("Plan your morning commute based on **Location**, **Weather**, and **Car Type**.")
 
 # 1. INPUTS
+# Initialize session state for location if it doesn't exist
+if 'latitude' not in st.session_state:
+    st.session_state.latitude = 51.50
+if 'longitude' not in st.session_state:
+    st.session_state.longitude = -0.12
+
 with st.container():
     col1, col2 = st.columns(2)
     with col1:
-        # Default to London, UK roughly
-        lat = st.number_input("Latitude", value=51.50, format="%.4f")
+        # Using 'key' links this widget to st.session_state.latitude automatically
+        lat = st.number_input("Latitude", key="latitude", format="%.4f")
     with col2:
-        lon = st.number_input("Longitude", value=-0.12, format="%.4f")
+        lon = st.number_input("Longitude", key="longitude", format="%.4f")
         
     car_choice = st.selectbox("Select Car Type", list(CAR_TYPES.keys()))
     
-    # Get Location Button (Mock functionality for web app)
+    # Get Location Button
     if st.button("📍 Use My Location (GeoIP Estimate)"):
-        # Simple IP-based lookup for convenience
         try:
-            loc_req = requests.get('https://ipapi.co/json/')
-            loc_data = loc_req.json()
-            lat = loc_data.get('latitude', 51.50)
-            lon = loc_data.get('longitude', -0.12)
-            st.success(f"Updated to: {loc_data.get('city')}, {loc_data.get('country_name')}")
-            st.rerun()
-        except:
-            st.warning("Could not fetch location automatically.")
+            with st.spinner("Locating..."):
+                # Added timeout to prevent hanging
+                loc_req = requests.get('https://ipapi.co/json/', timeout=5)
+                loc_data = loc_req.json()
+                
+                if 'latitude' in loc_data:
+                    # Update the session state directly
+                    st.session_state.latitude = float(loc_data.get('latitude'))
+                    st.session_state.longitude = float(loc_data.get('longitude'))
+                    st.success(f"Updated to: {loc_data.get('city')}, {loc_data.get('country_name')}")
+                    st.rerun()
+                else:
+                    st.error("Could not find coordinates in API response.")
+        except Exception as e:
+            st.warning(f"Could not fetch location: {e}")
 
 # 2. DATA PROCESSING
 if lat and lon:
