@@ -198,114 +198,56 @@ if lat and lon:
 
         st.divider()
 
-        # --- HORIZONTAL SCROLLABLE TIMELINE ---
+        # --- GRID VIEW (Reverted) ---
         st.subheader("📅 11-Day Forecast")
-        st.caption("Swipe left/right to view all days")
         
-        today_date = datetime.now().date()
-        
-        cards_html = ""
-        for index, row in morning_df.iterrows():
-            date_diff = (row['date'] - today_date).days
-            
-            # Logic: Past/Future=Small, Yest/Tom=Medium, Today=Big
-            if date_diff == 0:
-                size_class = "card-today"
-                badge = "TODAY"
-            elif date_diff == 1 or date_diff == -1:
-                size_class = "card-medium"
-                badge = row['date'].strftime('%a %d')
-            else:
-                size_class = "card-small"
-                badge = row['date'].strftime('%a %d')
-
-            bg_color = row['bg_color']
-            text_color = row['text_color']
-            
-            cards_html += f"""
-            <div class="weather-card {size_class}" style="background-color: {bg_color};">
-                <div class="card-badge">{badge}</div>
-                <div class="card-temp">{row['temp_c']}°C</div>
-                <div class="card-risk" style="color: {text_color};">{row['risk']}</div>
-                <div class="card-delay">{row['total_delay']}m</div>
-            </div>
-            """
-
-        # CSS: Using Flexbox which is superior for horizontal alignment
-        st.markdown(f"""
+        # CSS for cards
+        st.markdown("""
         <style>
-        .scroll-container {{
-            display: flex; /* Forces items into a row */
-            flex-direction: row;
-            flex-wrap: nowrap; /* Prevents wrapping to next line */
-            overflow-x: auto;
-            gap: 12px;
-            padding: 15px 5px 25px 5px; /* Bottom padding for scrollbar */
-            align-items: center;
-            -webkit-overflow-scrolling: touch;
-            width: 100%;
-        }}
-        
-        .weather-card {{
-            flex: 0 0 auto; /* KEY: Prevents shrinking/stacking */
+        .weather-card {
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            text-align: center;
+            border: 1px solid #ddd;
+            background-color: white;
+            min-height: 100px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            text-align: center;
-            border-radius: 12px;
-            border: 1px solid #ddd;
-            background-color: white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }}
-
-        /* SIZES */
-        .card-small {{
-            width: 80px;
-            height: 95px;
-            font-size: 0.8rem;
-        }}
-        .card-small .card-temp {{ font-size: 1rem; font-weight: bold; }}
-
-        .card-medium {{
-            width: 110px;
-            height: 120px;
-            font-size: 0.9rem;
-            border: 1px solid #bbb;
-        }}
-        .card-medium .card-temp {{ font-size: 1.2rem; font-weight: bold; }}
-        
-        .card-today {{
-            width: 140px;
-            height: 150px;
-            font-size: 1rem;
+        }
+        .today-card {
             border: 2px solid #2962ff;
-            background: #fff;
-            box-shadow: 0 4px 12px rgba(41, 98, 255, 0.2);
-            z-index: 5;
-        }}
-        .card-today .card-temp {{ font-size: 1.6rem; font-weight: 900; }}
-
-        /* Text Elements */
-        .card-badge {{ font-weight: bold; margin-bottom: 4px; }}
-        .card-risk {{ font-weight: 600; margin-bottom: 2px; line-height: 1.1; }}
-        .card-delay {{ opacity: 0.7; font-size: 0.85em; margin-top: 4px; }}
-
-        /* Scrollbar Styling */
-        .scroll-container::-webkit-scrollbar {{
-            height: 8px;
-        }}
-        .scroll-container::-webkit-scrollbar-track {{
-            background: #f0f0f0;
-            border-radius: 4px;
-        }}
-        .scroll-container::-webkit-scrollbar-thumb {{
-            background: #c1c1c1;
-            border-radius: 4px;
-        }}
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+        }
+        .weather-card h4 { margin: 0; font-size: 0.9em; }
+        .weather-card p { margin: 2px 0; }
         </style>
-
-        <div class="scroll-container">
-            {cards_html}
-        </div>
         """, unsafe_allow_html=True)
+
+        today_date = datetime.now().date()
+        
+        # Using native columns (6 columns wide)
+        cols = st.columns(6) 
+
+        for index, row in morning_df.iterrows():
+            col_idx = index % 6
+            
+            is_today = row['date'] == today_date
+            
+            # Styles
+            card_class = "weather-card today-card" if is_today else "weather-card"
+            badge = "TODAY" if is_today else row['date'].strftime('%a %d')
+            bg_color = row['bg_color']
+            text_color = row['text_color']
+            
+            with cols[col_idx]:
+                st.markdown(f"""
+                <div class="{card_class}" style="background-color: {bg_color};">
+                    <div style="font-weight:bold; font-size: 0.85em; margin-bottom: 4px;">{badge}</div>
+                    <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 2px;">{row['temp_c']}°C</div>
+                    <div style="color: {text_color}; font-weight: 600; font-size: 0.75em; line-height: 1.2;">{row['risk']}</div>
+                    <div style="font-size: 0.75em; margin-top:4px; opacity: 0.6;">+{row['total_delay']}m</div>
+                </div>
+                """, unsafe_allow_html=True)
