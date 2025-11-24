@@ -19,13 +19,14 @@ CAR_TYPES = {
 @st.cache_data(ttl=3600)
 def get_weather_data(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
+    # UPDATED: Fetches 5 past days and 6 forecast days (Today + 5 future)
     params = {
         "latitude": lat,
         "longitude": lon,
         "hourly": ["temperature_2m", "relative_humidity_2m", "dew_point_2m", "wind_speed_10m", "weather_code"],
         "timezone": "auto",
-        "past_days": 10,
-        "forecast_days": 7
+        "past_days": 5,
+        "forecast_days": 6 
     }
     try:
         response = requests.get(url, params=params)
@@ -207,50 +208,53 @@ if lat and lon:
 
         st.divider()
 
-        # --- GRID VIEW (17 DAYS) ---
-        st.subheader("📅 17-Day Overview")
+        # --- GRID VIEW (11 DAYS) ---
+        st.subheader("📅 11-Day Overview")
         st.caption("Morning forecast (7:00 AM snapshot)")
         
-        # Custom CSS for cards
+        # UPDATED CSS: Smaller padding, smaller fonts, tighter look
         st.markdown("""
         <style>
         .weather-card {
-            padding: 10px;
-            border-radius: 10px;
-            margin-bottom: 10px;
+            padding: 5px;
+            border-radius: 8px;
+            margin-bottom: 8px;
             text-align: center;
             border: 1px solid #ddd;
+            font-size: 0.9em;
         }
         .today-card {
             border: 2px solid #2962ff;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+        }
+        .weather-card h4 {
+            margin: 0;
+            font-size: 1em;
         }
         </style>
         """, unsafe_allow_html=True)
 
-        # Create Grid Layout
-        cols = st.columns(4) # 4 columns wide on desktop
+        # UPDATED: Tighter columns (6 instead of 4)
+        cols = st.columns(6) 
         today_date = datetime.now().date()
 
         for index, row in morning_df.iterrows():
-            # Determine which column to place this card in
-            col_idx = index % 4
+            col_idx = index % 6
             
-            # Identify Today
             is_today = row['date'] == today_date
             card_class = "weather-card today-card" if is_today else "weather-card"
-            badge = "🔵 **TODAY**" if is_today else f"**{row['date'].strftime('%a %d')}**"
+            # Simpler badge for smaller card
+            badge = "TODAY" if is_today else row['date'].strftime('%a %d')
             
             with cols[col_idx]:
-                # We use HTML/Markdown to create the card visual
                 bg_color = row['bg_color']
                 text_color = row['text_color']
                 
                 st.markdown(f"""
                 <div class="{card_class}" style="background-color: {bg_color};">
-                    <div>{badge}</div>
-                    <div style="font-size: 1.2em; font-weight: bold;">{row['temp_c']}°C</div>
-                    <div style="color: {text_color}; font-weight: 600;">{row['risk']}</div>
-                    <div style="font-size: 0.8em; margin-top:5px;">Delay: {row['total_delay']}m</div>
+                    <div style="font-weight:bold; margin-bottom:2px;">{badge}</div>
+                    <div style="font-size: 1.1em; font-weight: bold;">{row['temp_c']}°C</div>
+                    <div style="color: {text_color}; font-weight: 600; font-size: 0.8em; line-height: 1.2;">{row['risk']}</div>
+                    <div style="font-size: 0.75em; margin-top:4px; opacity: 0.8;">{row['total_delay']}m</div>
                 </div>
                 """, unsafe_allow_html=True)
