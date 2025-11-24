@@ -198,56 +198,87 @@ if lat and lon:
 
         st.divider()
 
-        # --- GRID VIEW (Reverted) ---
+        # --- RESPONSIVE GRID VIEW (HTML/CSS) ---
         st.subheader("📅 11-Day Forecast")
+        st.caption("7:00 AM Snapshot")
         
-        # CSS for cards
-        st.markdown("""
+        today_date = datetime.now().date()
+        
+        # Build HTML content
+        grid_html = ""
+        for index, row in morning_df.iterrows():
+            date_diff = (row['date'] - today_date).days
+            
+            # Visual Styles based on time
+            if date_diff == 0:
+                card_class = "card-today"
+                badge = "TODAY"
+            elif abs(date_diff) == 1:
+                card_class = "card-medium"
+                badge = row['date'].strftime('%a %d')
+            else:
+                card_class = "card-small"
+                badge = row['date'].strftime('%a %d')
+
+            bg_color = row['bg_color']
+            text_color = row['text_color']
+            
+            grid_html += f"""
+            <div class="weather-card {card_class}" style="background-color: {bg_color};">
+                <div class="card-badge">{badge}</div>
+                <div class="card-temp">{row['temp_c']}°C</div>
+                <div class="card-risk" style="color: {text_color};">{row['risk']}</div>
+                <div class="card-delay">+{row['total_delay']}m</div>
+            </div>
+            """
+
+        # CSS GRID: auto-fill with minmax ensures responsive columns on mobile
+        st.markdown(f"""
         <style>
-        .weather-card {
+        .weather-grid {{
+            display: grid;
+            /* This magic line forces 2+ columns on mobile (if screen > 220px) */
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            width: 100%;
+        }}
+        
+        .weather-card {{
             padding: 8px;
-            border-radius: 8px;
-            margin-bottom: 8px;
+            border-radius: 10px;
             text-align: center;
             border: 1px solid #ddd;
             background-color: white;
-            min-height: 100px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-        }
-        .today-card {
-            border: 2px solid #2962ff;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
-        }
-        .weather-card h4 { margin: 0; font-size: 0.9em; }
-        .weather-card p { margin: 2px 0; }
-        </style>
-        """, unsafe_allow_html=True)
-
-        today_date = datetime.now().date()
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }}
         
-        # Using native columns (6 columns wide)
-        cols = st.columns(6) 
+        /* Size Logic: We control visual weight via font/border, not physical grid cell size 
+           to keep the grid aligned cleanly */
+        .card-small {{ min-height: 90px; opacity: 0.9; }}
+        .card-small .card-temp {{ font-size: 1em; font-weight: bold; }}
+        
+        .card-medium {{ min-height: 100px; border-color: #bbb; }}
+        .card-medium .card-temp {{ font-size: 1.1em; font-weight: bold; }}
+        
+        .card-today {{ 
+            min-height: 110px; 
+            border: 2px solid #2962ff; 
+            background-color: #fff;
+            z-index: 2;
+        }}
+        .card-today .card-temp {{ font-size: 1.3em; font-weight: 900; color: #2962ff; }}
+        .card-today .card-badge {{ font-weight: 900; color: #2962ff; }}
 
-        for index, row in morning_df.iterrows():
-            col_idx = index % 6
-            
-            is_today = row['date'] == today_date
-            
-            # Styles
-            card_class = "weather-card today-card" if is_today else "weather-card"
-            badge = "TODAY" if is_today else row['date'].strftime('%a %d')
-            bg_color = row['bg_color']
-            text_color = row['text_color']
-            
-            with cols[col_idx]:
-                st.markdown(f"""
-                <div class="{card_class}" style="background-color: {bg_color};">
-                    <div style="font-weight:bold; font-size: 0.85em; margin-bottom: 4px;">{badge}</div>
-                    <div style="font-size: 1.1em; font-weight: bold; margin-bottom: 2px;">{row['temp_c']}°C</div>
-                    <div style="color: {text_color}; font-weight: 600; font-size: 0.75em; line-height: 1.2;">{row['risk']}</div>
-                    <div style="font-size: 0.75em; margin-top:4px; opacity: 0.6;">+{row['total_delay']}m</div>
-                </div>
-                """, unsafe_allow_html=True)
+        .card-badge {{ font-size: 0.8em; margin-bottom: 4px; font-weight: bold; }}
+        .card-risk {{ font-size: 0.75em; font-weight: 600; margin: 2px 0; line-height: 1.1; }}
+        .card-delay {{ font-size: 0.7em; margin-top: 4px; opacity: 0.6; }}
+        </style>
+
+        <div class="weather-grid">
+            {grid_html}
+        </div>
+        """, unsafe_allow_html=True)
