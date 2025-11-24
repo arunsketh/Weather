@@ -19,7 +19,6 @@ CAR_TYPES = {
 @st.cache_data(ttl=3600)
 def get_weather_data(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
-    # Fetches 5 past days and 6 forecast days (Today + 5 future)
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -201,7 +200,7 @@ if lat and lon:
 
         # --- HORIZONTAL SCROLLABLE TIMELINE ---
         st.subheader("📅 11-Day Forecast")
-        st.caption("Swipe to see past and future days")
+        st.caption("Swipe left/right to view all days")
         
         today_date = datetime.now().date()
         
@@ -232,87 +231,81 @@ if lat and lon:
             </div>
             """
 
-        # CSS: Enforces horizontal layout with flexbox
+        # CSS: Uses 'inline-block' method which is much more robust than flexbox for this
         st.markdown(f"""
         <style>
         .scroll-outer-wrapper {{
+            display: block;
             width: 100%;
             overflow-x: auto;
             white-space: nowrap;
-            padding-bottom: 15px;
+            padding: 10px 0 20px 0; /* padding bottom for scrollbar */
             -webkit-overflow-scrolling: touch;
         }}
         
-        .scroll-container {{
-            display: inline-flex !important; /* Forces horizontal row */
-            gap: 10px;
-            padding: 10px 5px;
-            align-items: center; /* Vertically center items */
-        }}
-        
+        /* The cards as inline blocks - this forces them into a single line */
         .weather-card {{
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
+            display: inline-block !important;
+            vertical-align: middle; /* Align them by their middle */
+            margin-right: 12px;
+            white-space: normal; /* Allow text inside to wrap if needed */
+            text-align: center;
             border-radius: 12px;
             border: 1px solid #ddd;
-            text-align: center;
-            flex-shrink: 0; /* Prevents squishing */
+            background-color: white;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            transition: transform 0.2s;
+            /* Important: Prevents squishing */
+            flex-shrink: 0; 
         }}
 
-        /* Small: Past & Future */
+        /* Specific Sizes with !important to ensure they stick */
         .card-small {{
-            width: 80px;
-            height: 90px;
-            font-size: 0.7rem;
-            opacity: 0.85;
+            width: 85px !important;
+            height: 100px !important;
+            padding-top: 10px;
         }}
+        .card-small .card-temp {{ font-size: 0.9rem; font-weight: bold; }}
+        .card-small .card-risk {{ font-size: 0.7rem; }}
         
-        /* Medium: Yesterday & Tomorrow */
         .card-medium {{
-            width: 100px;
-            height: 110px;
-            font-size: 0.85rem;
+            width: 110px !important;
+            height: 120px !important;
+            padding-top: 15px;
             border: 1px solid #bbb;
-            font-weight: 500;
         }}
+        .card-medium .card-temp {{ font-size: 1.1rem; font-weight: bold; }}
+        .card-medium .card-risk {{ font-size: 0.8rem; }}
         
-        /* Large: Today */
         .card-today {{
-            width: 130px;
-            height: 140px;
-            font-size: 1rem;
-            border: 2px solid #2962ff;
+            width: 150px !important;
+            height: 160px !important;
+            padding-top: 20px;
+            border: 3px solid #2962ff !important;
             background: #fff;
             box-shadow: 0 5px 15px rgba(41, 98, 255, 0.2);
             z-index: 2;
         }}
+        .card-today .card-temp {{ font-size: 1.5rem; font-weight: 900; }}
+        .card-today .card-risk {{ font-size: 1rem; font-weight: bold; }}
 
-        .card-badge {{ font-weight: bold; margin-bottom: 4px; }}
-        .card-temp {{ font-weight: 800; font-size: 1.1em; margin: 2px 0; }}
-        .card-risk {{ font-weight: 600; margin-bottom: 2px; }}
-        .card-delay {{ opacity: 0.7; font-size: 0.9em; }}
+        .card-badge {{ font-weight: bold; margin-bottom: 5px; font-size: 0.85rem; }}
+        .card-delay {{ opacity: 0.7; font-size: 0.8rem; margin-top: 5px; }}
 
-        /* Custom Scrollbar for Chrome/Safari/Edge */
+        /* Scrollbar styling */
         .scroll-outer-wrapper::-webkit-scrollbar {{
-            height: 6px;
+            height: 8px;
         }}
         .scroll-outer-wrapper::-webkit-scrollbar-track {{
             background: #f1f1f1;
-            border-radius: 3px;
+            border-radius: 4px;
         }}
         .scroll-outer-wrapper::-webkit-scrollbar-thumb {{
             background: #ccc;
-            border-radius: 3px;
+            border-radius: 4px;
         }}
         </style>
 
         <div class="scroll-outer-wrapper">
-            <div class="scroll-container">
-                {cards_html}
-            </div>
+            {cards_html}
         </div>
         """, unsafe_allow_html=True)
