@@ -16,12 +16,8 @@ CAR_TYPES = {
 
 # --- HELPER FUNCTIONS ---
 
-@st.cache_data(ttl=3600)  # Cache data for 1 hour to prevent spamming the API
+@st.cache_data(ttl=3600)
 def get_weather_data(lat, lon):
-    """
-    Fetches 10 days of history and 7 days of forecast in a single call 
-    using Open-Meteo's 'past_days' feature.
-    """
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": lat,
@@ -31,13 +27,11 @@ def get_weather_data(lat, lon):
         "past_days": 10,
         "forecast_days": 7
     }
-    
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
         data = response.json()
         
-        # Process Hourly Data
         hourly = data['hourly']
         df = pd.DataFrame({
             'time': pd.to_datetime(hourly['time']),
@@ -49,29 +43,21 @@ def get_weather_data(lat, lon):
         })
         return df
     except Exception as e:
-        st.error(f"Error fetching weather data: {e}")
+        st.error(f"Error fetching weather: {e}")
         return pd.DataFrame()
 
 def get_coordinates_from_search(query):
-    """
-    Tries to resolve a query to coordinates.
-    Priority 1: UK Postcode API (postcodes.io)
-    Priority 2: Open-Meteo Geocoding API (City names)
-    """
     # 1. Try UK Postcode
     try:
-        # Clean query for postcode (remove spaces for checking, though API handles them)
         clean_query = query.strip().replace(" ", "")
-        # quick regex check if it looks vaguely like a postcode to avoid unnecessary API calls for city names
-        # but postcodes.io is fast, so we can just hit it.
         resp = requests.get(f"https://api.postcodes.io/postcodes/{clean_query}", timeout=3)
         if resp.status_code == 200:
             data = resp.json()['result']
             return data['latitude'], data['longitude'], f"{data['postcode']}, {data.get('admin_district', 'UK')}"
     except:
-        pass # Fall through to city search
+        pass 
 
-    # 2. Try City Name (Open-Meteo Geocoding)
+    # 2. Try City Name
     try:
         resp = requests.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -89,182 +75,182 @@ def get_coordinates_from_search(query):
     return None, None, None
 
 def calculate_frost_risk(row):
-    """
-    Determines frost/fog risk based on physics.
-    """
     temp = row['temp_c']
     dew_point = row['dew_point_c']
     wind = row['wind_speed_kmh']
     humidity = row['humidity']
-    
-    # Dew Point Depression (Spread)
     spread = temp - dew_point
     
     risk_level = "None"
-    color = "green"
+    color = "#e6f4ea" # Default Light Green
+    text_color = "green"
     minutes_to_clear = 0
     condition = "Clear"
 
-    # 1. ICE / FROST LOGIC
-    # If temp is near freezing and close to dew point
     if temp <= 3.0: 
         if spread < 2.0 or (temp <= 0 and humidity > 80):
             if temp < -5:
                 risk_level = "Severe Ice"
-                color = "purple"
+                color = "#fce8e6" # Red tint
+                text_color = "darkred"
                 minutes_to_clear = 15
                 condition = "Hard Ice"
             elif temp <= 0:
                 risk_level = "Frost/Ice"
-                color = "red"
+                color = "#fce8e6" # Red tint
+                text_color = "red"
                 minutes_to_clear = 10
                 condition = "Icy"
             else:
                 risk_level = "Light Frost"
-                color = "orange"
+                color = "#fef7e0" # Yellow/Orange tint
+                text_color = "orange"
                 minutes_to_clear = 5
                 condition = "Frosty"
-
-    # 2. FOG LOGIC
-    # High humidity, low wind, small spread
     elif spread < 2.5 and humidity > 90 and wind < 10:
         risk_level = "Fog"
-        color = "gray"
-        minutes_to_clear = 2 # Mostly for visibility check
+        color = "#f1f3f4" # Grey tint
+        text_color = "gray"
+        minutes_to_clear = 2 
         condition = "Foggy"
         
-    return pd.Series([risk_level, color, minutes_to_clear, condition], 
-                     index=['risk', 'color', 'base_minutes', 'condition'])
+    return pd.Series([risk_level, color, text_color, minutes_to_clear, condition], 
+                     index=['risk', 'bg_color', 'text_color', 'base_minutes', 'condition'])
 
 # --- MAIN APP UI ---
 
 st.title("❄️ Windscreen Frost Predictor")
-st.markdown("Plan your morning commute based on **Location**, **Weather**, and **Car Type**.")
 
-# 1. INPUTS
-# Initialize session state for location if it doesn't exist
+# Initialize Session State
 if 'latitude' not in st.session_state:
-    st.session_state.latitude = 51.50
-if 'longitude' not in st.session_state:
+    st.session_state.latitude = 51.50 # Default London
     st.session_state.longitude = -0.12
+    st.session_state.location_name = "London, UK"
 
+# INPUT SECTION
 with st.container():
-    # --- NEW: Search Bar ---
-    search_col1, search_col2 = st.columns([3, 1])
-    with search_col1:
-        search_query = st.text_input("Search UK Postcode or City", placeholder="e.g., SW1A 1AA or Manchester")
-    with search_col2:
-        st.write("") # Spacing
-        st.write("") # Spacing
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        search_query = st.text_input("📍 Location", placeholder="Enter UK Postcode or City")
+    with col2:
+        st.write("")
+        st.write("")
         if st.button("🔎 Search"):
             if search_query:
-                found_lat, found_lon, found_name = get_coordinates_from_search(search_query)
-                if found_lat:
-                    st.session_state.latitude = found_lat
-                    st.session_state.longitude = found_lon
-                    st.success(f"Found: {found_name}")
+                lat, lon, name = get_coordinates_from_search(search_query)
+                if lat:
+                    st.session_state.latitude = lat
+                    st.session_state.longitude = lon
+                    st.session_state.location_name = name
                     st.rerun()
                 else:
-                    st.error("Location not found. Try a valid Postcode or City.")
+                    st.error("Not found.")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        # Using 'key' links this widget to st.session_state.latitude automatically
-        lat = st.number_input("Latitude", key="latitude", format="%.4f")
-    with col2:
-        lon = st.number_input("Longitude", key="longitude", format="%.4f")
-        
-    car_choice = st.selectbox("Select Car Type", list(CAR_TYPES.keys()))
-    
-    # Get Location Button
-    if st.button("📍 Use My Location (GeoIP Estimate)"):
+    # "Use My Location" fallback
+    if st.button("Use My Current Location"):
         try:
-            with st.spinner("Locating..."):
-                # Added timeout to prevent hanging
-                loc_req = requests.get('https://ipapi.co/json/', timeout=5)
-                loc_data = loc_req.json()
-                
-                if 'latitude' in loc_data:
-                    # Update the session state directly
-                    st.session_state.latitude = float(loc_data.get('latitude'))
-                    st.session_state.longitude = float(loc_data.get('longitude'))
-                    st.success(f"Updated to: {loc_data.get('city')}, {loc_data.get('country_name')}")
-                    st.rerun()
-                else:
-                    st.error("Could not find coordinates in API response.")
-        except Exception as e:
-            st.warning(f"Could not fetch location: {e}")
+            loc_req = requests.get('https://ipapi.co/json/', timeout=5)
+            loc_data = loc_req.json()
+            st.session_state.latitude = float(loc_data.get('latitude'))
+            st.session_state.longitude = float(loc_data.get('longitude'))
+            st.session_state.location_name = f"{loc_data.get('city')}, {loc_data.get('country_name')}"
+            st.rerun()
+        except:
+            st.warning("Could not detect location.")
 
-# 2. DATA PROCESSING
+    car_choice = st.selectbox("Select Car Type", list(CAR_TYPES.keys()))
+
+# DATA PROCESSING
+lat = st.session_state.latitude
+lon = st.session_state.longitude
+loc_name = st.session_state.location_name
+
 if lat and lon:
     df_raw = get_weather_data(lat, lon)
     
     if not df_raw.empty:
-        # Apply Logic
+        # Calculate Risk
         risk_cols = df_raw.apply(calculate_frost_risk, axis=1)
         df = pd.concat([df_raw, risk_cols], axis=1)
         
-        # Filter for "Morning Commute" hours (e.g., 6 AM - 9 AM) for the summary
-        # But we keep all data for the grid
         df['date'] = df['time'].dt.date
         df['hour'] = df['time'].dt.hour
         
-        # Calculate Adjustments
         car_factor = CAR_TYPES[car_choice]['factor']
         df['total_delay'] = (df['base_minutes'] * car_factor).round().astype(int)
 
-        # 3. TOMORROW'S PREDICTION (Hero Section)
-        tomorrow = datetime.now().date() + timedelta(days=1)
-        tomorrow_data = df[(df['date'] == tomorrow) & (df['hour'] == 7)] # Check 7 AM
-        
-        if not tomorrow_data.empty:
-            row = tomorrow_data.iloc[0]
-            delay = row['total_delay']
-            
-            st.divider()
-            st.subheader(f"Tomorrow Morning (7:00 AM)")
-            
-            # Dynamic Banner
-            if delay > 0:
-                msg = f"❄️ LEAVE {delay} MINUTES EARLY"
-                st.error(msg, icon="⚠️")
-                st.markdown(f"**Forecast:** {row['condition']} ({row['temp_c']}°C). High chance of {row['risk'].lower()} on your {car_choice}.")
-            else:
-                st.success("✅ No Delays Expected", icon="🚗")
-                st.markdown(f"**Forecast:** {row['condition']} ({row['temp_c']}°C). Windscreen should be clear.")
-            st.divider()
-
-        # 4. GRID VIEW (History & Future)
-        st.subheader("📅 17-Day Overview (7 AM Snapshot)")
-        
-        # Filter to show only 7 AM for the grid to keep it clean (or average of morning)
+        # Filter for Morning (7 AM)
         morning_df = df[df['hour'] == 7].copy()
         
-        # Select columns for display
-        display_df = morning_df[['date', 'temp_c', 'humidity', 'risk', 'total_delay']].copy()
-        display_df['temp_c'] = display_df['temp_c'].apply(lambda x: f"{x}°C")
-        display_df['humidity'] = display_df['humidity'].apply(lambda x: f"{x}%")
-        display_df['total_delay'] = display_df['total_delay'].apply(lambda x: f"+{x} min" if x > 0 else "-")
-        display_df.columns = ["Date", "Temp", "Humidity", "Risk", "Extra Time"]
+        # --- HERO SECTION ---
+        st.divider()
+        st.markdown(f"### Report for **{loc_name}**")
         
-        # Style the dataframe for the grid
-        def color_risk(val):
-            if val == "Severe Ice": color = '#ffcccb' # Red tint
-            elif val == "Frost/Ice": color = '#ffe5b4' # Orange tint
-            elif val == "Light Frost": color = '#fff9c4' # Yellow tint
-            elif val == "Fog": color = '#f5f5f5' # Grey tint
-            else: color = 'white'
-            return f'background-color: {color}; color: black'
+        tomorrow = datetime.now().date() + timedelta(days=1)
+        tomorrow_row = morning_df[morning_df['date'] == tomorrow]
+        
+        if not tomorrow_row.empty:
+            row = tomorrow_row.iloc[0]
+            delay = row['total_delay']
+            
+            col_hero_1, col_hero_2 = st.columns([2,1])
+            with col_hero_1:
+                st.subheader("Tomorrow Morning (7:00 AM)")
+                if delay > 0:
+                    st.error(f"❄️ Plan for +{delay} minutes delay")
+                    st.markdown(f"**{row['condition']}** expected. Temp: **{row['temp_c']}°C**")
+                else:
+                    st.success("✅ Clear Windscreen Expected")
+                    st.markdown(f"**{row['condition']}** expected. Temp: **{row['temp_c']}°C**")
+            with col_hero_2:
+                st.metric("Risk Level", row['risk'])
 
-        # Show current day marker
+        st.divider()
+
+        # --- GRID VIEW (17 DAYS) ---
+        st.subheader("📅 17-Day Overview")
+        st.caption("Morning forecast (7:00 AM snapshot)")
+        
+        # Custom CSS for cards
+        st.markdown("""
+        <style>
+        .weather-card {
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            text-align: center;
+            border: 1px solid #ddd;
+        }
+        .today-card {
+            border: 2px solid #2962ff;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Create Grid Layout
+        cols = st.columns(4) # 4 columns wide on desktop
         today_date = datetime.now().date()
-        
-        # Display editable grid (interactive) or static table
-        st.dataframe(
-            display_df.style.applymap(color_risk, subset=['Risk']),
-            use_container_width=True,
-            hide_index=True,
-            height=500
-        )
-        
-        st.caption("Note: Predictions are based on 7:00 AM weather conditions. Past data is historical, future data is forecasted.")
+
+        for index, row in morning_df.iterrows():
+            # Determine which column to place this card in
+            col_idx = index % 4
+            
+            # Identify Today
+            is_today = row['date'] == today_date
+            card_class = "weather-card today-card" if is_today else "weather-card"
+            badge = "🔵 **TODAY**" if is_today else f"**{row['date'].strftime('%a %d')}**"
+            
+            with cols[col_idx]:
+                # We use HTML/Markdown to create the card visual
+                bg_color = row['bg_color']
+                text_color = row['text_color']
+                
+                st.markdown(f"""
+                <div class="{card_class}" style="background-color: {bg_color};">
+                    <div>{badge}</div>
+                    <div style="font-size: 1.2em; font-weight: bold;">{row['temp_c']}°C</div>
+                    <div style="color: {text_color}; font-weight: 600;">{row['risk']}</div>
+                    <div style="font-size: 0.8em; margin-top:5px;">Delay: {row['total_delay']}m</div>
+                </div>
+                """, unsafe_allow_html=True)
