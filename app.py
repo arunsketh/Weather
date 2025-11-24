@@ -19,7 +19,6 @@ CAR_TYPES = {
 @st.cache_data(ttl=3600)
 def get_weather_data(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
-    # UPDATED: Fetches 5 past days and 6 forecast days (Today + 5 future)
     params = {
         "latitude": lat,
         "longitude": lon,
@@ -48,7 +47,6 @@ def get_weather_data(lat, lon):
         return pd.DataFrame()
 
 def get_coordinates_from_search(query):
-    # 1. Try UK Postcode
     try:
         clean_query = query.strip().replace(" ", "")
         resp = requests.get(f"https://api.postcodes.io/postcodes/{clean_query}", timeout=3)
@@ -58,7 +56,6 @@ def get_coordinates_from_search(query):
     except:
         pass 
 
-    # 2. Try City Name
     try:
         resp = requests.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -83,7 +80,7 @@ def calculate_frost_risk(row):
     spread = temp - dew_point
     
     risk_level = "None"
-    color = "#e6f4ea" # Default Light Green
+    color = "#e6f4ea" 
     text_color = "green"
     minutes_to_clear = 0
     condition = "Clear"
@@ -92,25 +89,25 @@ def calculate_frost_risk(row):
         if spread < 2.0 or (temp <= 0 and humidity > 80):
             if temp < -5:
                 risk_level = "Severe Ice"
-                color = "#fce8e6" # Red tint
+                color = "#fce8e6"
                 text_color = "darkred"
                 minutes_to_clear = 15
                 condition = "Hard Ice"
             elif temp <= 0:
                 risk_level = "Frost/Ice"
-                color = "#fce8e6" # Red tint
+                color = "#fce8e6"
                 text_color = "red"
                 minutes_to_clear = 10
                 condition = "Icy"
             else:
                 risk_level = "Light Frost"
-                color = "#fef7e0" # Yellow/Orange tint
+                color = "#fef7e0"
                 text_color = "orange"
                 minutes_to_clear = 5
                 condition = "Frosty"
     elif spread < 2.5 and humidity > 90 and wind < 10:
         risk_level = "Fog"
-        color = "#f1f3f4" # Grey tint
+        color = "#f1f3f4"
         text_color = "gray"
         minutes_to_clear = 2 
         condition = "Foggy"
@@ -122,13 +119,11 @@ def calculate_frost_risk(row):
 
 st.title("❄️ Windscreen Frost Predictor")
 
-# Initialize Session State
 if 'latitude' not in st.session_state:
-    st.session_state.latitude = 51.50 # Default London
+    st.session_state.latitude = 51.50 
     st.session_state.longitude = -0.12
     st.session_state.location_name = "London, UK"
 
-# INPUT SECTION
 with st.container():
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -147,7 +142,6 @@ with st.container():
                 else:
                     st.error("Not found.")
 
-    # "Use My Location" fallback
     if st.button("Use My Current Location"):
         try:
             loc_req = requests.get('https://ipapi.co/json/', timeout=5)
@@ -161,7 +155,6 @@ with st.container():
 
     car_choice = st.selectbox("Select Car Type", list(CAR_TYPES.keys()))
 
-# DATA PROCESSING
 lat = st.session_state.latitude
 lon = st.session_state.longitude
 loc_name = st.session_state.location_name
@@ -170,7 +163,6 @@ if lat and lon:
     df_raw = get_weather_data(lat, lon)
     
     if not df_raw.empty:
-        # Calculate Risk
         risk_cols = df_raw.apply(calculate_frost_risk, axis=1)
         df = pd.concat([df_raw, risk_cols], axis=1)
         
@@ -180,10 +172,8 @@ if lat and lon:
         car_factor = CAR_TYPES[car_choice]['factor']
         df['total_delay'] = (df['base_minutes'] * car_factor).round().astype(int)
 
-        # Filter for Morning (7 AM)
         morning_df = df[df['hour'] == 7].copy()
         
-        # --- HERO SECTION ---
         st.divider()
         st.markdown(f"### Report for **{loc_name}**")
         
@@ -208,53 +198,105 @@ if lat and lon:
 
         st.divider()
 
-        # --- GRID VIEW (11 DAYS) ---
-        st.subheader("📅 11-Day Overview")
-        st.caption("Morning forecast (7:00 AM snapshot)")
+        # --- SCROLLABLE STRIP (HTML/CSS) ---
+        st.subheader("📅 11-Day Forecast Timeline")
+        st.caption("Swipe left/right to see more days")
         
-        # UPDATED CSS: Smaller padding, smaller fonts, tighter look
-        st.markdown("""
-        <style>
-        .weather-card {
-            padding: 5px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            text-align: center;
-            border: 1px solid #ddd;
-            font-size: 0.9em;
-        }
-        .today-card {
-            border: 2px solid #2962ff;
-            box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-        }
-        .weather-card h4 {
-            margin: 0;
-            font-size: 1em;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # UPDATED: Tighter columns (6 instead of 4)
-        cols = st.columns(6) 
         today_date = datetime.now().date()
-
+        
+        # Generate HTML for each card
+        cards_html = ""
         for index, row in morning_df.iterrows():
-            col_idx = index % 6
+            date_diff = (row['date'] - today_date).days
             
-            is_today = row['date'] == today_date
-            card_class = "weather-card today-card" if is_today else "weather-card"
-            # Simpler badge for smaller card
-            badge = "TODAY" if is_today else row['date'].strftime('%a %d')
+            # Determine Size Class & Badge
+            if date_diff == 0:
+                # TODAY
+                size_class = "card-today"
+                badge = "TODAY"
+            elif date_diff == 1 or date_diff == -1:
+                # YESTERDAY / TOMORROW
+                size_class = "card-medium"
+                badge = row['date'].strftime('%a %d')
+            else:
+                # PAST / FUTURE
+                size_class = "card-small"
+                badge = row['date'].strftime('%a %d')
+
+            # content
+            bg_color = row['bg_color']
+            text_color = row['text_color']
             
-            with cols[col_idx]:
-                bg_color = row['bg_color']
-                text_color = row['text_color']
-                
-                st.markdown(f"""
-                <div class="{card_class}" style="background-color: {bg_color};">
-                    <div style="font-weight:bold; margin-bottom:2px;">{badge}</div>
-                    <div style="font-size: 1.1em; font-weight: bold;">{row['temp_c']}°C</div>
-                    <div style="color: {text_color}; font-weight: 600; font-size: 0.8em; line-height: 1.2;">{row['risk']}</div>
-                    <div style="font-size: 0.75em; margin-top:4px; opacity: 0.8;">{row['total_delay']}m</div>
-                </div>
-                """, unsafe_allow_html=True)
+            cards_html += f"""
+            <div class="weather-card {size_class}" style="background-color: {bg_color};">
+                <div class="card-badge">{badge}</div>
+                <div class="card-temp">{row['temp_c']}°C</div>
+                <div class="card-risk" style="color: {text_color};">{row['risk']}</div>
+                <div class="card-delay">{row['total_delay']}m</div>
+            </div>
+            """
+
+        # Inject Custom CSS and the Container
+        st.markdown(f"""
+        <style>
+        /* Scroll Container */
+        .scroll-container {{
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 8px;
+            padding-bottom: 15px;
+            align-items: center; /* Vertically center items of diff sizes */
+            -webkit-overflow-scrolling: touch; /* Smooth scroll on iOS */
+            scrollbar-width: thin;
+        }}
+        
+        /* Base Card */
+        .weather-card {{
+            flex: 0 0 auto; /* Do not shrink */
+            border-radius: 10px;
+            border: 1px solid #eee;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }}
+
+        /* Sizing Classes */
+        .card-small {{
+            width: 75px;
+            height: 90px;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }}
+        
+        .card-medium {{
+            width: 95px;
+            height: 110px;
+            font-size: 0.85rem;
+            border: 1px solid #ccc;
+        }}
+        
+        .card-today {{
+            width: 120px;
+            height: 140px;
+            font-size: 1rem;
+            border: 2px solid #2962ff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 10;
+            background: white;
+        }}
+
+        /* Internal Elements */
+        .card-badge {{ font-weight: bold; margin-bottom: 2px; }}
+        .card-temp {{ font-weight: 800; margin: 2px 0; }}
+        .card-risk {{ font-weight: 600; margin-bottom: 2px; line-height: 1.1; }}
+        .card-delay {{ font-size: 0.8em; opacity: 0.7; }}
+
+        </style>
+
+        <div class="scroll-container">
+            {cards_html}
+        </div>
+        """, unsafe_allow_html=True)
